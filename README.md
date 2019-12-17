@@ -1,6 +1,8 @@
 # Action cluster lights component for Home Assistant
 This custom component and driver for Home Assistant implements support for Cluster Lights as sold by [Action](https://www.action.com/nl-nl/p/clusterverlichting/) and other stores.
 
+![](screenshot.jpg?raw=true)
+
 ## What is working
 * Cluster Lights are represented as Light entity in home assistant
 * Cluster Lights support dimming and effects (patterns)
