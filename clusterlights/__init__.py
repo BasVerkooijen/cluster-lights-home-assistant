@@ -1,1 +1,1 @@
-"""The christmas lights component."""
+"""The cluster lights component."""
