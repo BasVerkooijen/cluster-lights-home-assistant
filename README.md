@@ -1,5 +1,5 @@
-# Action cluster lights component for Home Assistant
-This custom component and driver for Home Assistant implements support for Cluster Lights as sold by [Action](https://www.action.com/nl-nl/p/clusterverlichting/) and other stores.
+# Action Cluster Lights component for Home Assistant
+This custom component and driver for Home Assistant implements support for Cluster Lights as sold by [Action](https://www.action.com/nl-nl/p/clusterverlichting/) and some other stores.
 
 ![](screenshot.jpg?raw=true)
 
