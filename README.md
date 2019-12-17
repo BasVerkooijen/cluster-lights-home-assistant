@@ -57,3 +57,9 @@ Only support for Warm White variant currently
           (string)(Optional)
         
           A name for the entity to create in the front-end.
+
+4. Restart Home Assistant instance
+
+   Example for Python virtual env installation:
+   
+   `sudo systemctl restart home-assistant@homeassistant`
