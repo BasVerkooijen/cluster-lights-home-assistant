@@ -130,7 +130,7 @@ class ClusterLights(Light):
 			self._brightness = brightness
 			self._bulb.set_brightness(brightness)
 			
-		effect = kwargs[ATTR_EFFECT]
+		effect = kwargs.get(ATTR_EFFECT)
 		
 		if effect is not None:
 			self._effect = effect
