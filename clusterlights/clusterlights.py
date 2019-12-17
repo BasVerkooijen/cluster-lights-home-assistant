@@ -10,7 +10,7 @@ class Delegate(btle.DefaultDelegate):
 	
 	def handleNotification(self, cHandle, data):
 		"""Handle notifications from state handle."""
-		if len(data) <= 5:		# Power response (off() and on())
+		if len(data) <= 5:	# Power response (off() and on())
 			power = bool(data[3])
 			self.cluster_lights.set_recv_state(power)
 		elif len(data) >= 18:	# Status response (get_information())
@@ -34,10 +34,10 @@ class clusterlights:
 		STAY_OFF			= 0x00
 		WAVE				= 0x01
 		PHASE				= 0x02
-		PHASED_FADE_AWAY	= 0x04
-		PHASED_TWINKLE		= 0x08
+		PHASED_FADE_AWAY		= 0x04
+		PHASED_TWINKLE			= 0x08
 		FADE_AWAY			= 0x10
-		FAST_TWINKLE		= 0x20
+		FAST_TWINKLE			= 0x20
 		STAY_ON				= 0x40
 	
 	def __init__(self, mac):
