@@ -5,7 +5,7 @@ This custom component and driver for Home Assistant implements support for Clust
 * Cluster Lights are represented as Light entity in home assistant
 * Cluster Lights support dimming and effects (patterns)
 
-## Limitiations
+## Limitations
 Only support for Warm White variant currently
 
 # Requirements for Home Assistant instance
