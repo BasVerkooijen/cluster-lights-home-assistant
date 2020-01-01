@@ -11,8 +11,8 @@ This custom component and driver for Home Assistant implements support for Clust
 Only support for Warm White variant currently
 
 # Requirements for Home Assistant instance
-* Bluetooth adapter supporting Bluetooth Low-Energy (BLE) is required
-* Cluster Lights must be in range of Home Assistant instance (Bluetooth adapter range)
+* Bluetooth adapter supporting Bluetooth Low-Energy (BLE)
+* Cluster Lights must be in range of Home Assistant instance (due to bluetooth adapter range)
 
 # Python dependencies
 * bluepy
@@ -25,13 +25,13 @@ Only support for Warm White variant currently
 
    `git clone https://github.com/BasVerkooijen/cluster-lights-home-assistant.git`
 
-2. Copy the folder 'clusterlights' to your 'custom_components' folder in Home Assistant installation directory
+2. Copy the folder `clusterlights` to your `custom_components` folder in Home Assistant installation directory
 
-   *Optional: Create the 'custom_components' folder in your Home Assistant installation directory if you don't have custom components yet:*
+   *Optional: Create the `custom_components` folder in your Home Assistant configuration directory if you don't have custom components yet:*
    
-   `mkdir <path to your install dir>/custom_components`
+   *`mkdir <path to your config dir>/custom_components`*
 
-   `cp -r <path to git repo>/clusterlights <path to your install dir>/custom_components`
+   `cp -r <path to git repo>/clusterlights <path to your config dir>/custom_components`
 3. Add a configuration for your cluster lights to configuration.yaml
 
    ```
