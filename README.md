@@ -1,14 +1,14 @@
-# Action Cluster Lights component for Home Assistant
-This custom component and driver for Home Assistant implements support for Cluster Lights as sold by [Action](https://www.action.com/nl-nl/p/clusterverlichting/) and some other stores.
+# Cluster Lights component for Home Assistant
+This custom component and driver for Home Assistant implements support for PerfectLED Cluster Lights as sold by Action and some [other stores](https://www.kabelshop.nl/PerfectLED-Clusterverlichting-met-app-7-meter-Bluetooth-576-LEDs-Binnen-Buiten-AX8718700-i7551-t101352.html). The Cluster Lights are supported by the [Lights App](https://play.google.com/store/apps/details?id=com.scinan.novolink.lightstring).
 
 ![](screenshot.jpg?raw=true)
 
 ## What is working
 * Cluster Lights are represented as Light entity in home assistant
-* Cluster Lights support dimming and effects (patterns)
+* Cluster Lights support brightness (dimming) and effects (patterns)
 
 ## Limitations
-Only support for Warm White variant currently
+Only support for Warm White variant currently.
 
 # Requirements for Home Assistant instance
 * Bluetooth adapter supporting Bluetooth Low-Energy (BLE)
@@ -32,7 +32,7 @@ Only support for Warm White variant currently
    *`mkdir <path to your config dir>/custom_components`*
 
    `cp -r <path to git repo>/clusterlights <path to your config dir>/custom_components`
-3. Add a configuration for your cluster lights to configuration.yaml
+3. Add a configuration for your cluster lights to `configuration.yaml`
 
    ```
    # configuration.yaml
