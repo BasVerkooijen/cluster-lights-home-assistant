@@ -1,4 +1,4 @@
-"""Support for Action Cluster Lights."""
+"""Support for Cluster Lights."""
 import logging
 
 import voluptuous as vol
@@ -9,7 +9,7 @@ from homeassistant.components.light import (
 	PLATFORM_SCHEMA,
 	SUPPORT_BRIGHTNESS,
 	SUPPORT_EFFECT,
-	Light,
+	LightEntity,
 )
 from .clusterlights import clusterlights
 from homeassistant.const import CONF_DEVICES, CONF_NAME
@@ -54,7 +54,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 	add_entities(lights, True)
 
 
-class ClusterLights(Light):
+class ClusterLights(LightEntity):
 	"""Representation of cluster lights."""
 	
 	def __init__(self, device):
