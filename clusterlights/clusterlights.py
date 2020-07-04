@@ -63,7 +63,7 @@ class clusterlights:
 		
 		handles = self.device.getCharacteristics()
 		for handle in handles:
-			if handle.uuid == "fff1":	# Characterstic which handles commands
+			if handle.uuid == "fff1":	# Characteristic which handles commands
 				self.controlhandle = handle
 			if handle.uuid == "fff4":	# Characteristic which publishes feedback notifications
 				self.statehandle = handle
