@@ -1,5 +1,5 @@
 # Cluster Lights component for Home Assistant
-This custom component and driver for Home Assistant implements support for PerfectLED Cluster Lights as sold by Action and some [other stores](https://www.kabelshop.nl/PerfectLED-Clusterverlichting-met-app-7-meter-Bluetooth-576-LEDs-Binnen-Buiten-AX8718700-i7551-t101352.html). The Cluster Lights are supported by the [Lights App](https://play.google.com/store/apps/details?id=com.scinan.novolink.lightstring).
+This custom component and driver for Home Assistant implements support for Cluster Lights as sold by Action and some [other stores](https://www.kabelshop.nl/PerfectLED-Clusterverlichting-met-app-7-meter-Bluetooth-576-LEDs-Binnen-Buiten-AX8718700-i7551-t101352.html). The Cluster Lights are supported by the [Lights App](https://play.google.com/store/apps/details?id=com.scinan.novolink.lightstring).
 
 ![](screenshot.jpg?raw=true)
 
@@ -27,7 +27,7 @@ Only support for Warm White variant currently.
 
 2. Copy the folder `clusterlights` to your `custom_components` folder in Home Assistant installation directory
 
-   *Optional: Create the `custom_components` folder in your Home Assistant configuration directory if you don't have custom components yet:*
+   *❓: Create the `custom_components` folder in your Home Assistant configuration directory if you don't have custom components yet:*
    
    *`mkdir <path to your config dir>/custom_components`*
 
@@ -65,3 +65,7 @@ Only support for Warm White variant currently.
    Example for Python virtual env installation:
    
    `sudo systemctl restart home-assistant@homeassistant`
+
+5. The `clusterlights` integration will create a light entity with the provided name. You can add this entity to your lovelace dashboard with the _light card_.
+   
+   **⚠️: When no entity is created, the integration failed to initialize the cluster lights. You can inspect the Home Assistant log to see what is going wrong.** 
