@@ -58,7 +58,11 @@ class clusterlights:
 
 	def connect(self):
 		"""Connect to the cluster lights through BLE."""
-		self.device = btle.Peripheral(self.mac, addrType=btle.ADDR_TYPE_PUBLIC)
+		try:
+			self.device = btle.Peripheral(self.mac, addrType=btle.ADDR_TYPE_PUBLIC)
+		except btle.BTLEDisconnectError:
+			return False
+		
 		self.device.setDelegate(Delegate(self))
 		
 		handles = self.device.getCharacteristics()
