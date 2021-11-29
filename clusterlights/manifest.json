@@ -1,6 +1,7 @@
 {
   "domain": "clusterlights",
   "name": "Cluster Lights",
+  "version": "1.0.0",
   "documentation": "https://github.com/BasVerkooijen/cluster-lights-home-assistant",
   "dependencies": [],
   "codeowners": [],
