@@ -87,13 +87,11 @@ class clusterlights:
 	async def ble_task_loop(self):
 		"""BLE task to keep connection active"""
 		if not self.packets.empty():
-			print("send packet")
 			packet = self.packets.get()
 			await self._send_packet(packet)
 	
 	async def _connect(self):
 		"""Connect to the cluster lights through BLE."""
-		print("_connect()")
 		services = self.device.services
 		for service in services:
 			chars = service.characteristics
@@ -115,7 +113,6 @@ class clusterlights:
 
 	async def _send_packet(self, packet):
 		"""Send a command to the cluster lights through BLE on control char."""
-		initial = time.time()
 		await self.device.write_gatt_char(self.controlhandle, bytes(packet.data), False) # No response
 				
 	def _notification_handler(self, characteristic, data: bytearray):
