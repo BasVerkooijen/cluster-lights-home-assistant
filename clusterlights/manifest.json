@@ -5,5 +5,5 @@
   "documentation": "https://github.com/BasVerkooijen/cluster-lights-home-assistant",
   "dependencies": [],
   "codeowners": [],
-  "requirements": []
+  "requirements": ["bleak"]
 }

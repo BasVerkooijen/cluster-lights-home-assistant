@@ -1,23 +1,15 @@
 import time
+import asyncio
 from enum import IntEnum
+import threading,queue
+from dataclasses import dataclass
 
-from bluepy import btle
+from bleak import *
 
-class Delegate(btle.DefaultDelegate):
-	def __init__(self, cluster_lights):
-		self.cluster_lights = cluster_lights
-		btle.DefaultDelegate.__init__(self)
-	
-	def handleNotification(self, cHandle, data):
-		"""Handle notifications from state handle."""
-		if len(data) <= 5:	# Power response (off() and on())
-			power = bool(data[3])
-			self.cluster_lights.set_recv_state(power)
-		elif len(data) >= 18:	# Status response (get_information())
-			brightness = int(data[3])
-			pattern = int(data[17])
-			self.cluster_lights.set_recv_brightness(brightness)
-			self.cluster_lights.set_recv_pattern(pattern)
+@dataclass
+class Packet:
+    data: bytearray
+    notify: bool
 
 class clusterlights:
 	"""
@@ -43,6 +35,10 @@ class clusterlights:
 	def __init__(self, mac):
 		"""Initialize the cluster lights."""
 		self.mac = mac
+		self.stop = False
+		self.brightness = 0
+		self.power = False
+		self.pattern = self.Pattern.STAY_OFF
 		
 	def set_recv_pattern(self, pattern):
 		"""Handle receiving the pattern byte."""
@@ -55,50 +51,100 @@ class clusterlights:
 	def set_recv_state(self, power):
 		"""Handle receiving the power state byte."""
 		self.power = power
-
+		
 	def connect(self):
-		"""Connect to the cluster lights through BLE."""
-		try:
-			self.device = btle.Peripheral(self.mac, addrType=btle.ADDR_TYPE_PUBLIC)
-		except btle.BTLEDisconnectError:
-			return False
+		self.task = threading.Thread(target=self.task, args=())
+		self.task.start()
 		
-		self.device.setDelegate(Delegate(self))
+	def disconnect(self):
+		self.stop = True
+		self.task.join()
 		
-		handles = self.device.getCharacteristics()
-		for handle in handles:
-			if handle.uuid == "fff1":	# Characteristic which handles commands
-				self.controlhandle = handle
-			if handle.uuid == "fff4":	# Characteristic which publishes feedback notifications
-				self.statehandle = handle
-		# Subscribe for notifications
-		self.device.writeCharacteristic(self.statehandle.valHandle + 1, b"\x01\x00")
-		# Sync the state of the cluster lights
-		self.get_state()
-		self.get_information()
+	def task(self):
+		self.packets = queue.Queue(maxsize=20)
+		asyncio.run(self.ble_task())
+		print("Task closed")
 
-	def send_packet(self, handle, data):
-		"""Send a command to the cluster lights through BLE."""
+	async def ble_task(self):
+		"""BLE task"""
+		async with BleakClient(self.mac) as self.device:
+			# Connected
+			print(f"Connected clusterlights to {self.mac}")
+			# Now retrieve the chars and states and enable notifications
+			await self._connect()
+			print("Enter ble_main_task loop")
+			
+			# Enter BLE connection task
+			# Loops until user stops AND queue is empty
+			while self.stop == False or not self.packets.empty():
+				await self.ble_task_loop()
+				
+			# End loop
+			# Requested disconnect
+			await self.device.disconnect()
+			print(f"Disconnected clusterlights from {self.mac}")
+	
+	async def ble_task_loop(self):
+		"""BLE task to keep connection active"""
+		if not self.packets.empty():
+			print("send packet")
+			packet = self.packets.get()
+			await self._send_packet(packet)
+	
+	async def _connect(self):
+		"""Connect to the cluster lights through BLE."""
+		print("_connect()")
+		services = self.device.services
+		for service in services:
+			chars = service.characteristics
+			for char in chars:
+				uuid = char.uuid[4:8] # filter 16-bit uuid from 128-bit uuid
+				if uuid == "fff1":	# Characteristic which handles commands
+					self.controlhandle = char
+				if uuid == "fff4":	# Characteristic which publishes feedback notifications
+					self.statehandle = char
+		# Subscribe for notifications
+		await self.device.start_notify(self.statehandle, self._notification_handler)
+		# Sync the state of the cluster lights
+		self._get_state()
+		self._get_information()
+		
+	def send_packet(self, data, notify):
+		packet = Packet(data, notify)
+		self.packets.put(packet)
+
+	async def _send_packet(self, packet):
+		"""Send a command to the cluster lights through BLE on control char."""
 		initial = time.time()
-		while True:
-			if time.time() - initial >= 10:
-				return False
-			try:
-				return handle.write(bytes(data), withResponse=False)
-			except:
-				self.connect()
+		await self.device.write_gatt_char(self.controlhandle, bytes(packet.data), False) # No response
+				
+	def _notification_handler(self, characteristic, data: bytearray):
+		self.notify = True
+		"""Handle notifications from state handle."""
+		if len(data) <= 5:	# Power response (off() and on())
+			power = bool(data[3])
+			self.set_recv_state(power)
+			self.info = True
+			print("Power notification received")
+		elif len(data) >= 18:	# Status response (get_information())
+			brightness = int(data[3])
+			pattern = int(data[17])
+			self.set_recv_brightness(brightness)
+			self.set_recv_pattern(pattern)
+			self.status = True
+			print("Status notification received")
 
 	def off(self):
 		"""Turn off the cluster lights."""
 		self.power = False
 		packet = bytearray([0x01, 0x01, 0x01, 0x00])
-		self.send_packet(self.controlhandle, packet)
+		self.send_packet(packet, False)
 
 	def on(self):
 		"""Turn on the cluster lights."""
 		self.power = True
 		packet = bytearray([0x01, 0x01, 0x01, 0x01])
-		self.send_packet(self.controlhandle, packet)
+		self.send_packet(packet, False)
 
 	def set_brightness(self, brightness):
 		"""Set the brightness of the cluster lights."""
@@ -106,7 +152,7 @@ class clusterlights:
 		packet = bytearray([0x03, 0x01, 0x01])
 		value = self._translate(brightness, 0, 255, 0, 99)
 		packet.append(int(value))
-		self.send_packet(self.controlhandle, packet)
+		self.send_packet(packet, False)
 
 	def _translate(self, value, leftMin, leftMax, rightMin, rightMax):
 		"""Helper function for mapping values between ranges."""
@@ -128,8 +174,7 @@ class clusterlights:
 			self.pattern &= ~int(pattern)
 		packet = bytearray([0x05, 0x01, 0x02, 0x03])
 		packet.append(self.pattern)
-		self.send_packet(self.controlhandle, packet)
-		self.device.waitForNotifications(1.0)
+		self.send_packet(packet, False)
 
 	def set_wave(self, active):
 		"""Enable or disable the wave pattern for the cluster lights."""
@@ -158,18 +203,24 @@ class clusterlights:
 	def set_stay_on(self, active):
 		"""Enable or disable the stay on pattern for the cluster lights."""
 		self._set_pattern(self.Pattern.STAY_ON, active)
+		
+	def _get_state(self):
+		"""Updates the state of the cluster lights for get functions."""
+		packet = bytearray([0x00]) # Get power state
+		self.send_packet(packet, True)
+		
+	def _get_information(self):
+		"""Updates the pattern and brightness information of the cluster lights for get functions."""
+		packet = bytearray([0x02, 0x00, 0x01]) # Get lights information
+		self.send_packet(packet, True)
 
 	def get_state(self):
 		"""Updates the state of the cluster lights for get functions."""
-		packet = bytearray([0x00]) # Get power state
-		self.send_packet(self.controlhandle, packet)
-		self.device.waitForNotifications(1.0)
+		self._get_state()
 
 	def get_information(self):
 		"""Updates the pattern and brightness information of the cluster lights for get functions."""
-		packet = bytearray([0x02, 0x00, 0x01]) # Get lights information
-		self.send_packet(self.controlhandle, packet)
-		self.device.waitForNotifications(1.0)
+		self._get_information()
 
 	def get_on(self):
 		"""Returns the state of the cluster lights."""
