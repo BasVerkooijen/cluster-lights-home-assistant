@@ -10,6 +10,7 @@ from bleak import *
 class Packet:
     data: bytearray
     notify: bool
+    disconnect: bool # default False
 
 class clusterlights:
 	"""
@@ -36,9 +37,10 @@ class clusterlights:
 		"""Initialize the cluster lights."""
 		self.mac = mac
 		self.stop = False
-		self.brightness = 0
+		self.brightness = 255
 		self.power = False
 		self.pattern = self.Pattern.STAY_OFF
+		self.comms_loss = False
 		
 	def set_recv_pattern(self, pattern):
 		"""Handle receiving the pattern byte."""
@@ -53,45 +55,77 @@ class clusterlights:
 		self.power = power
 		
 	def connect(self):
+		"""Starts BLE task to connect and maintain connection"""
 		self.task = threading.Thread(target=self.task, args=())
 		self.task.start()
 		
 	def disconnect(self):
+		"""Stops BLE task and disconnects from cluster lights"""
 		self.stop = True
+		self._disconnect()
 		self.task.join()
 		
+	def _disconnect(self):
+		"""Puts a special packet in the queue to unblock the task and disconnect"""
+		packet = Packet(bytearray([0x00]), False, True)
+		self.packets.put(packet)
+		
 	def task(self):
+		"""Runs BLE task to completion, restarts BLE task on unexpected disconnect"""
 		self.packets = queue.Queue(maxsize=20)
-		asyncio.run(self.ble_task())
+		
+		restart_task = True
+		
+		while restart_task:
+			if self.comms_loss:
+				# Retry later
+				time.sleep(5)
+			
+			# Connect and do ble
+			asyncio.run(self.ble_task())
+			# Connection aborted
+			restart_task = self.comms_loss
+			# On comms loss, restart connection
 		print("Task closed")
 
 	async def ble_task(self):
 		"""BLE task"""
-		async with BleakClient(self.mac) as self.device:
-			# Connected
-			print(f"Connected clusterlights to {self.mac}")
-			# Now retrieve the chars and states and enable notifications
-			await self._connect()
-			print("Enter ble_main_task loop")
-			
-			# Enter BLE connection task
-			# Loops until user stops AND queue is empty
-			while self.stop == False or not self.packets.empty():
-				await self.ble_task_loop()
+		device = await BleakScanner.find_device_by_address(self.mac, timeout=20.0)
+		if device:
+			async with BleakClient(device) as self.device:
+				# Connected
+				print(f"Connected clusterlights to {self.mac}")
+				# Now retrieve the chars and states and enable notifications
+				await self._connect()
+				#print("Enter ble_main_task loop")
 				
-			# End loop
-			# Requested disconnect
-			await self.device.disconnect()
-			print(f"Disconnected clusterlights from {self.mac}")
+				# Enter BLE connection task
+				# Loops until user stops AND queue is empty
+				while self.stop == False and self.comms_loss is False:
+					await self.ble_task_loop()
+					
+				# End loop
+				if not self.comms_loss:
+					# Requested disconnect
+					await self.device.disconnect()
+				print(f"Disconnected clusterlights from {self.mac}")
+		else:
+			print(f"Cluster lights {self.mac} could not be found")
+			print("Note that the device can only be connected to one client at a time")
+			print("Retry in 5s")
+			self.comms_loss = True
 	
 	async def ble_task_loop(self):
-		"""BLE task to keep connection active"""
-		if not self.packets.empty():
-			packet = self.packets.get()
+		"""BLE task to keep connection active, handles connection events"""
+		packet = self.packets.get() # Blocks task until packet queued
+		if not packet.disconnect: # Exception to stop comms
 			await self._send_packet(packet)
 	
 	async def _connect(self):
-		"""Connect to the cluster lights through BLE."""
+		"""Connect to the cluster lights through BLE and sync state."""
+		self.stop = False
+		self.comms_loss = False
+		
 		services = self.device.services
 		for service in services:
 			chars = service.characteristics
@@ -108,7 +142,7 @@ class clusterlights:
 		self._get_information()
 		
 	def send_packet(self, data, notify):
-		packet = Packet(data, notify)
+		packet = Packet(data, notify, False)
 		self.packets.put(packet)
 
 	async def _send_packet(self, packet):
@@ -116,20 +150,17 @@ class clusterlights:
 		await self.device.write_gatt_char(self.controlhandle, bytes(packet.data), False) # No response
 				
 	def _notification_handler(self, characteristic, data: bytearray):
-		self.notify = True
 		"""Handle notifications from state handle."""
 		if len(data) <= 5:	# Power response (off() and on())
 			power = bool(data[3])
 			self.set_recv_state(power)
-			self.info = True
-			print("Power notification received")
+			#print("Power notification received")
 		elif len(data) >= 18:	# Status response (get_information())
 			brightness = int(data[3])
 			pattern = int(data[17])
 			self.set_recv_brightness(brightness)
 			self.set_recv_pattern(pattern)
-			self.status = True
-			print("Status notification received")
+			#print("Status notification received")
 
 	def off(self):
 		"""Turn off the cluster lights."""
