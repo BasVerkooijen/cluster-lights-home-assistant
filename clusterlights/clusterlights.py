@@ -147,7 +147,14 @@ class clusterlights:
 
 	async def _send_packet(self, packet):
 		"""Send a command to the cluster lights through BLE on control char."""
-		await self.device.write_gatt_char(self.controlhandle, bytes(packet.data), False) # No response
+		try:
+			await self.device.write_gatt_char(self.controlhandle, bytes(packet.data), False) # No response
+		except Exception as e:
+			print("exception occurred at writing characteristic")
+			print(f"exception is of type: {type(e)}")
+			print(f"Exception detail: {print(e)}")
+			print("Attempt to reconnect in 5s")
+			self.comms_loss = True
 				
 	def _notification_handler(self, characteristic, data: bytearray):
 		"""Handle notifications from state handle."""
