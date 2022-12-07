@@ -41,6 +41,8 @@ class clusterlights:
 		self.power = False
 		self.pattern = self.Pattern.STAY_OFF
 		self.comms_loss = False
+		self.notify_state_event = asyncio.Event()
+		self.notify_info_event = asyncio.Event()
 		
 	def set_recv_pattern(self, pattern):
 		"""Handle receiving the pattern byte."""
@@ -82,7 +84,11 @@ class clusterlights:
 				time.sleep(5)
 			
 			# Connect and do ble
-			asyncio.run(self.ble_task())
+			loop = asyncio.new_event_loop()
+			asyncio.set_event_loop(loop)
+			loop.run_until_complete(self.ble_task())
+			loop.close()
+			
 			# Connection aborted
 			restart_task = self.comms_loss
 			# On comms loss, restart connection
@@ -138,13 +144,13 @@ class clusterlights:
 		# Subscribe for notifications
 		await self.device.start_notify(self.statehandle, self._notification_handler)
 		# Sync the state of the cluster lights
-		self._get_state()
-		self._get_information()
+		await self._get_state(False)
+		await self._get_information(False)
 		
-	def send_packet(self, data, notify):
-		packet = Packet(data, notify, False)
+	def send_packet(self, data):
+		packet = Packet(data, False, False)
 		self.packets.put(packet)
-
+		
 	async def _send_packet(self, packet):
 		"""Send a command to the cluster lights through BLE on control char."""
 		try:
@@ -159,10 +165,12 @@ class clusterlights:
 	def _notification_handler(self, characteristic, data: bytearray):
 		"""Handle notifications from state handle."""
 		if len(data) <= 5:	# Power response (off() and on())
+			self.notify_state_event.set()
 			power = bool(data[3])
 			self.set_recv_state(power)
 			#print("Power notification received")
 		elif len(data) >= 18:	# Status response (get_information())
+			self.notify_info_event.set()
 			brightness = int(data[3])
 			pattern = int(data[17])
 			self.set_recv_brightness(brightness)
@@ -173,13 +181,13 @@ class clusterlights:
 		"""Turn off the cluster lights."""
 		self.power = False
 		packet = bytearray([0x01, 0x01, 0x01, 0x00])
-		self.send_packet(packet, False)
+		self.send_packet(packet)
 
 	def on(self):
 		"""Turn on the cluster lights."""
 		self.power = True
 		packet = bytearray([0x01, 0x01, 0x01, 0x01])
-		self.send_packet(packet, False)
+		self.send_packet(packet)
 
 	def set_brightness(self, brightness):
 		"""Set the brightness of the cluster lights."""
@@ -187,7 +195,7 @@ class clusterlights:
 		packet = bytearray([0x03, 0x01, 0x01])
 		value = self._translate(brightness, 0, 255, 0, 99)
 		packet.append(int(value))
-		self.send_packet(packet, False)
+		self.send_packet(packet)
 
 	def _translate(self, value, leftMin, leftMax, rightMin, rightMax):
 		"""Helper function for mapping values between ranges."""
@@ -209,7 +217,16 @@ class clusterlights:
 			self.pattern &= ~int(pattern)
 		packet = bytearray([0x05, 0x01, 0x02, 0x03])
 		packet.append(self.pattern)
-		self.send_packet(packet, False)
+		self.send_packet(packet)
+		asyncio.run(self._wait_for_info_notification())
+	
+	async def _wait_for_info_notification(self):
+		"""Wait for info notification received or give up after 1 second"""
+		try:
+			await asyncio.wait_for(self.notify_info_event.wait(), timeout=1.0)
+		except:
+			print("No info notification, give up")
+			pass
 
 	def set_wave(self, active):
 		"""Enable or disable the wave pattern for the cluster lights."""
@@ -239,23 +256,33 @@ class clusterlights:
 		"""Enable or disable the stay on pattern for the cluster lights."""
 		self._set_pattern(self.Pattern.STAY_ON, active)
 		
-	def _get_state(self):
+	async def _get_state(self, wait):
 		"""Updates the state of the cluster lights for get functions."""
 		packet = bytearray([0x00]) # Get power state
-		self.send_packet(packet, True)
+		self.send_packet(packet)
+		if wait:
+			# Wait for notify received
+			try:
+				await asyncio.wait_for(self.notify_state_event.wait(), timeout=1.0)
+			except:
+				print("No state notification, give up")
+				pass
 		
-	def _get_information(self):
+		
+	async def _get_information(self, wait):
 		"""Updates the pattern and brightness information of the cluster lights for get functions."""
 		packet = bytearray([0x02, 0x00, 0x01]) # Get lights information
-		self.send_packet(packet, True)
+		self.send_packet(packet)
+		if wait:
+			await self._wait_for_info_notification()
 
 	def get_state(self):
 		"""Updates the state of the cluster lights for get functions."""
-		self._get_state()
+		asyncio.run(self._get_state(True))
 
 	def get_information(self):
 		"""Updates the pattern and brightness information of the cluster lights for get functions."""
-		self._get_information()
+		asyncio.run(self._get_information(True))
 
 	def get_on(self):
 		"""Returns the state of the cluster lights."""
