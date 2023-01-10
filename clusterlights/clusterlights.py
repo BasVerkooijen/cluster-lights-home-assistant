@@ -4,6 +4,7 @@ from enum import IntEnum
 import threading,queue
 from dataclasses import dataclass
 
+from homeassistant.components import bluetooth
 from bleak import *
 
 @dataclass
@@ -33,9 +34,10 @@ class clusterlights:
 		FAST_TWINKLE			= 0x20
 		STAY_ON				= 0x40
 	
-	def __init__(self, mac):
+	def __init__(self, mac, hass):
 		"""Initialize the cluster lights."""
 		self.mac = mac
+		self.hass = hass
 		self.stop = False
 		self.brightness = 255
 		self.power = False
@@ -96,31 +98,38 @@ class clusterlights:
 
 	async def ble_task(self):
 		"""BLE task"""
-		device = await BleakScanner.find_device_by_address(self.mac, timeout=20.0)
+#		scanner = bluetooth.async_get_scanner(self.hass)
+#		device = await scanner.find_device_by_address(self.mac, timeout=20.0)
+		device = bluetooth.async_ble_device_from_address(self.hass, self.mac, connectable=True)
 		if device:
-			async with BleakClient(device) as self.device:
-				# Connected
-				print(f"Connected clusterlights to {self.mac}")
-				# Now retrieve the chars and states and enable notifications
-				await self._connect()
-				#print("Enter ble_main_task loop")
-				
-				# Enter BLE connection task
-				# Loops until user stops AND queue is empty
-				while self.stop == False and self.comms_loss is False:
-					await self.ble_task_loop()
+			try:
+				async with BleakClient(device) as self.device:
+					# Connected
+					print(f"Connected clusterlights to {self.mac}")
+					# Now retrieve the chars and states and enable notifications
+					await self._connect()
+					#print("Enter ble_main_task loop")
 					
-				# End loop
-				if not self.comms_loss:
-					# Requested disconnect
-					await self.device.disconnect()
-				print(f"Disconnected clusterlights from {self.mac}")
+					# Enter BLE connection task
+					# Loops until user stops AND queue is empty
+					while self.stop == False and self.comms_loss is False:
+						await self.ble_task_loop()
+						
+					# End loop
+					if not self.comms_loss:
+						# Requested disconnect
+						await self.device.disconnect()
+					print(f"Disconnected clusterlights from {self.mac}")
+			except:
+				print("Error while connecting, retry in 5s")
+				self.comms_loss = True
+				pass
 		else:
 			print(f"Cluster lights {self.mac} could not be found")
 			print("Note that the device can only be connected to one client at a time")
 			print("Retry in 5s")
 			self.comms_loss = True
-	
+
 	async def ble_task_loop(self):
 		"""BLE task to keep connection active, handles connection events"""
 		packet = self.packets.get() # Blocks task until packet queued
@@ -168,14 +177,14 @@ class clusterlights:
 			self.notify_state_event.set()
 			power = bool(data[3])
 			self.set_recv_state(power)
-			#print("Power notification received")
+			print("Power notification received")
 		elif len(data) >= 18:	# Status response (get_information())
 			self.notify_info_event.set()
 			brightness = int(data[3])
 			pattern = int(data[17])
 			self.set_recv_brightness(brightness)
 			self.set_recv_pattern(pattern)
-			#print("Status notification received")
+			print("Status notification received")
 
 	def off(self):
 		"""Turn off the cluster lights."""

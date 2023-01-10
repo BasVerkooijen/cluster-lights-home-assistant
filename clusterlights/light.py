@@ -47,7 +47,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 		device = {}
 		device["name"] = device_config[CONF_NAME]
 		device["address"] = address
-		light = ClusterLights(device)
+		light = ClusterLights(device, hass)
 		if light.is_valid:
 			lights.append(light)
 	
@@ -57,13 +57,13 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class ClusterLights(LightEntity):
 	"""Representation of cluster lights."""
 	
-	def __init__(self, device):
+	def __init__(self, device, hass):
 		"""Initialize the cluster lights."""
 	
 		self._name = device["name"]
 		self._address = device["address"]
 		self.is_valid = True
-		self._bulb = clusterlights(self._address)
+		self._bulb = clusterlights(self._address, hass)
 		self._brightness = 0
 		self._state = False
 		self._effect_list = list(LIGHT_EFFECT_LIST)
